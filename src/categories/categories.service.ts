@@ -48,6 +48,8 @@ export class CategoriesService {
 
   async remove(id: number) {
 
+    console.table("solo quiero ver")
+
     const category = await this.findOne(id)
 
     // Eliminar la categoría
