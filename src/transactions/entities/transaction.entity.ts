@@ -1,5 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn, JoinColumn } from 'typeorm';
 import { Category } from 'src/categories/entities/category.entity';
+import { User } from 'src/users/entities/user.entity';
 
 export enum TransactionType {
     EXPENSE = 'expense',
@@ -29,4 +30,7 @@ export class Transaction {
 
     @CreateDateColumn()
     createdAt: Date;
+
+    @ManyToOne(() => User, user => user.transactions)
+    user: User;
 }

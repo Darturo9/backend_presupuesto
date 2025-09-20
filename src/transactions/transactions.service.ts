@@ -66,4 +66,16 @@ export class TransactionsService {
       id
     };
   }
+
+  async sumExpensesByCategoryAndPeriod(categoryId: number, period: string): Promise<number> {
+    const result = await this.transactionRepository
+      .createQueryBuilder('transaction')
+      .select('SUM(transaction.amount)', 'sum')
+      .where('transaction.categoryId = :categoryId', { categoryId })
+      .andWhere('transaction.type = :type', { type: 'expense' })
+      .andWhere('to_char(transaction.createdAt, \'YYYY-MM\') = :period', { period })
+      .getRawOne();
+
+    return Number(result.sum) || 0;
+  }
 }

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe, Query } from '@nestjs/common';
 import { CategoriesService } from './categories.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
@@ -13,8 +13,14 @@ export class CategoriesController {
   }
 
   @Get()
-  findAll() {
-    return this.categoriesService.findAll();
+  findAll(
+    @Query('type') type?: string,
+    @Query('isActive') isActive?: boolean,
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
+    @Query('name') name?: string,
+  ) {
+    return this.categoriesService.findAll({ type, isActive, page, limit, name });
   }
 
   @Get(':id')

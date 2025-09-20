@@ -6,6 +6,8 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { CategoriesModule } from './categories/categories.module';
 import { TransactionsModule } from './transactions/transactions.module';
+import { BudgetsModule } from './budgets/budgets.module';
+import { UsersModule } from './users/users.module';
 
 
 @Module({
@@ -14,6 +16,8 @@ import { TransactionsModule } from './transactions/transactions.module';
     TypeOrmModule.forRoot(typeOrmConfig),
     CategoriesModule,
     TransactionsModule,
+    BudgetsModule,
+    UsersModule,
   ],
   controllers: [AppController],
   providers: [AppService],

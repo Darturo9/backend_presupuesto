@@ -1,5 +1,6 @@
 import { Transaction } from 'src/transactions/entities/transaction.entity';
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm';
+import { User } from 'src/users/entities/user.entity';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany, ManyToOne, Unique } from 'typeorm';
 
 // Definir el enum para los tipos de categoría
 export enum CategoryType {
@@ -7,6 +8,7 @@ export enum CategoryType {
     INCOME = 'income',
 }
 
+@Unique(['user', 'name']) // <-- Aquí
 @Entity('categories')
 export class Category {
     @PrimaryGeneratedColumn()
@@ -30,4 +32,7 @@ export class Category {
 
     @OneToMany(() => Transaction, transaction => transaction.category)
     transactions: Transaction[];
+
+    @ManyToOne(() => User, user => user.categories)
+    user: User;
 }

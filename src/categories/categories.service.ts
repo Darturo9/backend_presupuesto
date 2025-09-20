@@ -17,9 +17,34 @@ export class CategoriesService {
     return await this.categoriesRepository.save(createCategoryDto);
   }
 
-  async findAll() {
-    //retorna todas las categorais
-    return await this.categoriesRepository.findAndCount()
+  async findAll(filters: {
+    type?: string;
+    isActive?: boolean;
+    page?: number;
+    limit?: number;
+    name?: string;
+  } = {}) {
+    const where: any = {};
+    if (filters.type) where.type = filters.type;
+    if (filters.isActive !== undefined) where.isActive = filters.isActive;
+    if (filters.name) where.name = filters.name;
+
+    const page = filters.page ?? 1;
+    const limit = filters.limit ?? 10;
+
+    const [data, total] = await this.categoriesRepository.findAndCount({
+      where,
+      order: { name: 'ASC' },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+
+    return {
+      data,
+      total,
+      page,
+      lastPage: Math.ceil(total / limit),
+    };
   }
 
   async findOne(id: number) {
@@ -48,15 +73,13 @@ export class CategoriesService {
 
   async remove(id: number) {
 
-    console.table("solo quiero ver")
-
     const category = await this.findOne(id)
 
-    // Eliminar la categoría
-    await this.categoriesRepository.remove(category);
+    category.isActive = false
+    await this.categoriesRepository.save(category)
 
     return {
-      message: `Categoría con id ${id} eliminada correctamente`,
+      message: `Categoría con id ${id} desactivada correctamente`,
       id
     };
   }
