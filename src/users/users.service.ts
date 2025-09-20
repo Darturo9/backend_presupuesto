@@ -90,4 +90,8 @@ export class UsersService {
 
     return { message: `Usuario con id ${id} desactivado correctamente` };
   }
+
+  async findByEmail(email: string): Promise<User | null> {
+    return this.usersRepository.findOne({ where: { email } });
+  }
 }

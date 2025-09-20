@@ -12,7 +12,7 @@ export class User {
     email: string;
 
     @Column({ nullable: true })
-    password: string; // Puede ser null si solo usa Google
+    password?: string; // Puede ser null si solo usa Google
 
     @Index()
     @Column({ nullable: true, unique: true })
