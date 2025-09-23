@@ -94,4 +94,12 @@ export class UsersService {
   async findByEmail(email: string): Promise<User | null> {
     return this.usersRepository.findOne({ where: { email } });
   }
+
+  async updateGoogleId(userId: number, googleId: string) {
+    return this.usersRepository.save({
+      id: userId,
+      googleId,
+    });
+  }
+
 }

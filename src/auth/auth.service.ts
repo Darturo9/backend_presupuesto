@@ -46,11 +46,15 @@ export class AuthService {
                 lastName: body.lastName || '',
                 avatar: body.avatar,
             });
+        } else if (!user.googleId) {
+            user = await this.usersService.updateGoogleId(user.id, body.googleId);
         } else if (user.googleId !== body.googleId) {
             throw new UnauthorizedException('El Google ID no coincide con el usuario registrado');
         }
 
-        const { password, ...result } = user;
+        // Ahora user nunca es null
+        const { password, ...result } = user!;
         return result;
     }
+
 }
