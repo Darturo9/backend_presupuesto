@@ -31,6 +31,8 @@ async function bootstrap() {
       forbidNonWhitelisted: true, // Arroja error si hay propiedades no definidas
     }),
   );
-  await app.listen(process.env.PORT ?? 4000);
+  const port = process.env.PORT ?? 4000;
+  await app.listen(port);
+  console.log(`🚀 Servidor corriendo en puerto ${port}`);
 }
 bootstrap();

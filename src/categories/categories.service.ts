@@ -1,9 +1,10 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Category } from './entities/category.entity';
+import { Category, CategoryType } from './entities/category.entity';
+import { User } from '../users/entities/user.entity';
 
 @Injectable()
 export class CategoriesService {
@@ -13,8 +14,22 @@ export class CategoriesService {
   ) { }
 
 
-  async create(createCategoryDto: CreateCategoryDto): Promise<Category> {
-    return await this.categoriesRepository.save(createCategoryDto);
+  async create(createCategoryDto: CreateCategoryDto, userId: number): Promise<Category> {
+    console.log('🔍 Service - create category data:', createCategoryDto);
+    console.log('🔍 Service - user id:', userId);
+
+    const category = this.categoriesRepository.create({
+      name: createCategoryDto.name,
+      description: createCategoryDto.description || '',
+      type: createCategoryDto.type || CategoryType.EXPENSE,
+      user: { id: userId } as User
+    });
+
+    console.log('🔍 Service - created category object:', category);
+
+    const result = await this.categoriesRepository.save(category);
+    console.log('🔍 Service - saved category result:', result);
+    return result;
   }
 
   async findAll(filters: {
@@ -23,8 +38,8 @@ export class CategoriesService {
     page?: number;
     limit?: number;
     name?: string;
-  } = {}) {
-    const where: any = {};
+  } = {}, userId: number) {
+    const where: any = { user: { id: userId } };
     if (filters.type) where.type = filters.type;
     if (filters.isActive !== undefined) where.isActive = filters.isActive;
     if (filters.name) where.name = filters.name;
@@ -47,8 +62,21 @@ export class CategoriesService {
     };
   }
 
-  async findOne(id: number) {
+  async findOne(id: number, userId: number) {
+    const category = await this.categoriesRepository.findOne({
+      where: { id, user: { id: userId } },
+      relations: ['transactions'],
+    });
 
+    if (!category) {
+      throw new NotFoundException(`Categoría con id ${id} no encontrada`);
+    }
+
+    return category;
+  }
+
+  // Método temporal para otros servicios que no tienen userId disponible
+  async findOneById(id: number) {
     const category = await this.categoriesRepository.findOne({
       where: { id },
       relations: ['transactions'],
@@ -58,25 +86,36 @@ export class CategoriesService {
       throw new NotFoundException(`Categoría con id ${id} no encontrada`);
     }
 
-    return category
-
+    return category;
   }
 
-  async update(id: number, updateCategoryDto: UpdateCategoryDto) {
-    const category = await this.findOne(id)
+  async update(id: number, updateCategoryDto: UpdateCategoryDto, userId: number) {
+    console.log('🔍 Service - update id:', id);
+    console.log('🔍 Service - update data:', updateCategoryDto);
+    console.log('🔍 Service - update data keys:', Object.keys(updateCategoryDto || {}));
+    console.log('🔍 Service - user id:', userId);
 
-    this.categoriesRepository.merge(category, updateCategoryDto)
+    if (!updateCategoryDto || Object.keys(updateCategoryDto).length === 0) {
+      console.log('❌ Service - No update fields provided');
+      throw new BadRequestException('No hay campos para actualizar');
+    }
 
-    return await this.categoriesRepository.save(category)
+    const category = await this.findOne(id, userId);
+    console.log('🔍 Service - found category:', category);
 
+    this.categoriesRepository.merge(category, updateCategoryDto);
+    console.log('🔍 Service - merged category:', category);
+
+    const result = await this.categoriesRepository.save(category);
+    console.log('🔍 Service - saved category result:', result);
+    return result;
   }
 
-  async remove(id: number) {
+  async remove(id: number, userId: number) {
+    const category = await this.findOne(id, userId);
 
-    const category = await this.findOne(id)
-
-    category.isActive = false
-    await this.categoriesRepository.save(category)
+    category.isActive = false;
+    await this.categoriesRepository.save(category);
 
     return {
       message: `Categoría con id ${id} desactivada correctamente`,

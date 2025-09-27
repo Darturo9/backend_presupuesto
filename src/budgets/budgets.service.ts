@@ -31,7 +31,7 @@ export class BudgetsService {
       throw new Error('Ya existe un presupuesto para esta categoría y periodo.');
     }
 
-    const category = await this.categoriesService.findOne(createBudgetDto.categoryId);
+    const category = await this.categoriesService.findOneById(createBudgetDto.categoryId);
 
     const budget = this.budgetsRepository.create({
       ...createBudgetDto,
@@ -98,7 +98,7 @@ export class BudgetsService {
 
     // Si se envía un nuevo categoryId, valida y actualiza la categoría
     if (updateBudgetDto.categoryId) {
-      budget.category = await this.categoriesService.findOne(updateBudgetDto.categoryId);
+      budget.category = await this.categoriesService.findOneById(updateBudgetDto.categoryId);
     }
 
     // Actualiza los demás campos
