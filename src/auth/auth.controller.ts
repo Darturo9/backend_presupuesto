@@ -1,10 +1,12 @@
 import { Controller, Post, Body, UnauthorizedException } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) { }
 
+  @Throttle({ default: { limit: 5, ttl: 60000 } }) // 5 intentos por minuto
   @Post('login')
   async login(@Body() body: { email: string; password: string }) {
     const user = await this.authService.validateUser(body.email, body.password);
@@ -14,6 +16,7 @@ export class AuthController {
     return this.authService.login(user);
   }
 
+  @Throttle({ default: { limit: 5, ttl: 60000 } }) // 5 intentos por minuto
   @Post('google')
   async googleLogin(@Body() body: { email: string; googleId: string; firstName?: string; lastName?: string; avatar?: string }) {
     const user = await this.authService.validateGoogleUser(body);

@@ -10,7 +10,9 @@ const typeOrmConfig: TypeOrmModuleOptions = {
     database: process.env.DB_DATABASE || 'database.sqlite',
     entities: [__dirname + '/../**/*.entity{.ts,.js}'],
     synchronize: true,
-    ssl: true,
+    ssl: {
+        rejectUnauthorized: false,
+    },
 };
 
 export default typeOrmConfig;

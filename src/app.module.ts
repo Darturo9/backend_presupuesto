@@ -1,6 +1,9 @@
 import { Module, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_GUARD, APP_FILTER } from '@nestjs/core';
+import { ThrottlerExceptionFilter } from './common/filters/throttler-exception.filter';
 import typeOrmConfig from '../config/typeOrmConfig';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -15,6 +18,12 @@ import { AuthModule } from './auth/auth.module';
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     TypeOrmModule.forRoot(typeOrmConfig),
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60000, // 60 segundos
+        limit: 100, // máximo 100 requests por minuto (general)
+      },
+    ]),
     CategoriesModule,
     TransactionsModule,
     BudgetsModule,
@@ -22,7 +31,17 @@ import { AuthModule } from './auth/auth.module';
     AuthModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+    {
+      provide: APP_FILTER,
+      useClass: ThrottlerExceptionFilter,
+    },
+  ],
 })
 export class AppModule implements OnApplicationBootstrap {
   private readonly logger = new Logger(AppModule.name);

@@ -32,5 +32,9 @@ export class Transaction {
     createdAt: Date;
 
     @ManyToOne(() => User, user => user.transactions)
+    @JoinColumn({ name: 'userId' })
     user: User;
+
+    @Column()
+    userId: number;
 }

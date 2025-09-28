@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, Like } from 'typeorm';
 import { Category, CategoryType } from './entities/category.entity';
 import { User } from '../users/entities/user.entity';
 
@@ -15,9 +15,6 @@ export class CategoriesService {
 
 
   async create(createCategoryDto: CreateCategoryDto, userId: number): Promise<Category> {
-    console.log('🔍 Service - create category data:', createCategoryDto);
-    console.log('🔍 Service - user id:', userId);
-
     const category = this.categoriesRepository.create({
       name: createCategoryDto.name,
       description: createCategoryDto.description || '',
@@ -25,10 +22,7 @@ export class CategoriesService {
       user: { id: userId } as User
     });
 
-    console.log('🔍 Service - created category object:', category);
-
     const result = await this.categoriesRepository.save(category);
-    console.log('🔍 Service - saved category result:', result);
     return result;
   }
 
@@ -42,7 +36,7 @@ export class CategoriesService {
     const where: any = { user: { id: userId } };
     if (filters.type) where.type = filters.type;
     if (filters.isActive !== undefined) where.isActive = filters.isActive;
-    if (filters.name) where.name = filters.name;
+    if (filters.name) where.name = Like(`%${filters.name}%`);
 
     const page = filters.page ?? 1;
     const limit = filters.limit ?? 10;
@@ -90,24 +84,13 @@ export class CategoriesService {
   }
 
   async update(id: number, updateCategoryDto: UpdateCategoryDto, userId: number) {
-    console.log('🔍 Service - update id:', id);
-    console.log('🔍 Service - update data:', updateCategoryDto);
-    console.log('🔍 Service - update data keys:', Object.keys(updateCategoryDto || {}));
-    console.log('🔍 Service - user id:', userId);
-
     if (!updateCategoryDto || Object.keys(updateCategoryDto).length === 0) {
-      console.log('❌ Service - No update fields provided');
       throw new BadRequestException('No hay campos para actualizar');
     }
 
     const category = await this.findOne(id, userId);
-    console.log('🔍 Service - found category:', category);
-
     this.categoriesRepository.merge(category, updateCategoryDto);
-    console.log('🔍 Service - merged category:', category);
-
     const result = await this.categoriesRepository.save(category);
-    console.log('🔍 Service - saved category result:', result);
     return result;
   }
 

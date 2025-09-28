@@ -1,5 +1,6 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Request, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { TransactionsService } from './transactions.service';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
 import { UpdateTransactionDto } from './dto/update-transaction.dto';
@@ -12,14 +13,27 @@ import { AuthGuard } from '@nestjs/passport';
 export class TransactionsController {
   constructor(private readonly transactionsService: TransactionsService) { }
 
+  @Throttle({ default: { limit: 20, ttl: 60000 } }) // 20 transacciones por minuto
   @Post()
-  create(@Body() createTransactionDto: CreateTransactionDto) {
-    return this.transactionsService.create(createTransactionDto);
+  create(@Body() createTransactionDto: CreateTransactionDto, @Request() req) {
+    const userId = req.user.userId;
+    return this.transactionsService.create(createTransactionDto, userId);
   }
 
   @Get()
-  findAll() {
-    return this.transactionsService.findAll();
+  findAll(@Request() req, @Query() queryParams: any) {
+    const userId = req.user.userId || req.user.id;
+
+    const filters = {
+      type: queryParams.type,
+      categoryId: queryParams.categoryId ? parseInt(queryParams.categoryId) : undefined,
+      startDate: queryParams.startDate,
+      endDate: queryParams.endDate,
+      page: queryParams.page ? parseInt(queryParams.page) : undefined,
+      limit: queryParams.limit ? parseInt(queryParams.limit) : undefined,
+    };
+
+    return this.transactionsService.findAll(filters, userId);
   }
 
   @Get(':id')
@@ -27,11 +41,13 @@ export class TransactionsController {
     return this.transactionsService.findOne(+id);
   }
 
+  @Throttle({ default: { limit: 15, ttl: 60000 } }) // 15 actualizaciones por minuto
   @Patch(':id')
   update(@Param('id') id: string, @Body() updateTransactionDto: UpdateTransactionDto) {
     return this.transactionsService.update(+id, updateTransactionDto);
   }
 
+  @Throttle({ default: { limit: 10, ttl: 60000 } }) // 10 eliminaciones por minuto
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.transactionsService.remove(+id);

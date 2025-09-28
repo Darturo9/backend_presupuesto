@@ -16,20 +16,66 @@ export class TransactionsService {
   ) { }
 
 
-  async create(createTransactionDto: CreateTransactionDto) {
-
-    const category = await this.categoriesService.findOneById(createTransactionDto.categoryId)
+  async create(createTransactionDto: CreateTransactionDto, userId: number) {
+    const category = await this.categoriesService.findOneById(createTransactionDto.categoryId);
 
     const transaction = this.transactionRepository.create({
       ...createTransactionDto,
       category,
-    })
-    return await this.transactionRepository.save(transaction);
+      userId: userId
+    });
 
+    const savedTransaction = await this.transactionRepository.save(transaction);
+    return savedTransaction;
   }
 
-  async findAll() {
-    return await this.transactionRepository.findAndCount()
+  async findAll(filters: {
+    type?: string;
+    categoryId?: number;
+    startDate?: string;
+    endDate?: string;
+    page?: number;
+    limit?: number;
+  } = {}, userId: number) {
+    const page = filters.page ?? 1;
+    const limit = filters.limit ?? 10;
+
+    const queryBuilder = this.transactionRepository
+      .createQueryBuilder('transaction')
+      .leftJoinAndSelect('transaction.category', 'category')
+      .where('transaction.userId = :userId', { userId });
+
+    // Aplicar filtros
+    if (filters.type) {
+      queryBuilder.andWhere('transaction.type = :type', { type: filters.type });
+    }
+
+    if (filters.categoryId) {
+      queryBuilder.andWhere('transaction.categoryId = :categoryId', { categoryId: filters.categoryId });
+    }
+
+    if (filters.startDate) {
+      queryBuilder.andWhere('transaction.createdAt >= :startDate', { startDate: filters.startDate });
+    }
+
+    if (filters.endDate) {
+      queryBuilder.andWhere('transaction.createdAt <= :endDate', { endDate: filters.endDate + ' 23:59:59' });
+    }
+
+    // Ordenar por fecha más reciente primero
+    queryBuilder.orderBy('transaction.createdAt', 'DESC');
+
+    // Paginación
+    queryBuilder.skip((page - 1) * limit).take(limit);
+
+    const [data, total] = await queryBuilder.getManyAndCount();
+
+    return {
+      data,
+      total,
+      page,
+      lastPage: Math.ceil(total / limit),
+    };
   }
 
   async findOne(id: number) {
