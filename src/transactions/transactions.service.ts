@@ -5,6 +5,9 @@ import { Repository } from 'typeorm';
 import { Transaction } from './entities/transaction.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { CategoriesService } from 'src/categories/categories.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { UserSettings } from '../users/entities/user-settings.entity';
+import { NotificationType, NotificationPriority } from '../notifications/entities/notification.entity';
 
 @Injectable()
 export class TransactionsService {
@@ -12,7 +15,10 @@ export class TransactionsService {
   constructor(
     @InjectRepository(Transaction)
     private transactionRepository: Repository<Transaction>,
-    private categoriesService: CategoriesService
+    private categoriesService: CategoriesService,
+    private notificationsService: NotificationsService,
+    @InjectRepository(UserSettings)
+    private userSettingsRepository: Repository<UserSettings>
   ) { }
 
 
@@ -26,6 +32,12 @@ export class TransactionsService {
     });
 
     const savedTransaction = await this.transactionRepository.save(transaction);
+
+    // Solo verificar presupuesto si es un gasto
+    if (createTransactionDto.type === 'expense') {
+      await this.checkBudgetAlert(userId, category.id, createTransactionDto.amount);
+    }
+
     return savedTransaction;
   }
 
@@ -113,15 +125,19 @@ export class TransactionsService {
     };
   }
 
-  async sumExpensesByCategoryAndPeriod(categoryId: number, period: string): Promise<number> {
-    const result = await this.transactionRepository
+  async sumExpensesByCategoryAndPeriod(categoryId: number, period: string, userId?: number): Promise<number> {
+    const queryBuilder = this.transactionRepository
       .createQueryBuilder('transaction')
       .select('SUM(transaction.amount)', 'sum')
       .where('transaction.categoryId = :categoryId', { categoryId })
       .andWhere('transaction.type = :type', { type: 'expense' })
-      .andWhere('to_char(transaction.createdAt, \'YYYY-MM\') = :period', { period })
-      .getRawOne();
+      .andWhere('to_char(transaction.createdAt, \'YYYY-MM\') = :period', { period });
 
+    if (userId) {
+      queryBuilder.andWhere('transaction.userId = :userId', { userId });
+    }
+
+    const result = await queryBuilder.getRawOne();
     return Number(result.sum) || 0;
   }
 
@@ -184,5 +200,88 @@ export class TransactionsService {
       category: item.categoryName,
       amount: Number(item.total) || 0,
     }));
+  }
+
+  private async checkBudgetAlert(userId: number, categoryId: number, transactionAmount: number) {
+    try {
+      // Verificar configuración de notificaciones del usuario
+      const userSettings = await this.userSettingsRepository.findOne({
+        where: { user: { id: userId } }
+      });
+
+      if (!userSettings?.budgetAlerts) {
+        return;
+      }
+
+      // Obtener el período actual (YYYY-MM)
+      const currentPeriod = new Date().toISOString().slice(0, 7);
+
+      // Buscar presupuestos activos para esta categoría y período
+      const budgets = await this.transactionRepository.manager.query(`
+        SELECT b.id, b.name, b.amount, b.period
+        FROM budgets b
+        WHERE b.categoryId = ? AND b.period = ?
+      `, [categoryId, currentPeriod]);
+
+      for (const budget of budgets) {
+        // Calcular gastos actuales en esta categoría y período
+        const currentSpent = await this.sumExpensesByCategoryAndPeriod(categoryId, currentPeriod, userId);
+
+        const spentPercentage = (currentSpent / budget.amount) * 100;
+        const remaining = budget.amount - currentSpent;
+
+        // Alertas por porcentaje de presupuesto usado
+        if (spentPercentage >= 90 && spentPercentage < 100) {
+          await this.notificationsService.createNotification({
+            userId,
+            title: '🚨 Presupuesto casi agotado',
+            message: `Has gastado el ${spentPercentage.toFixed(1)}% de tu presupuesto "${budget.name}". Te quedan $${remaining.toFixed(2)}.`,
+            type: NotificationType.BUDGET_ALERT,
+            priority: NotificationPriority.HIGH,
+            metadata: {
+              budgetId: budget.id,
+              categoryId,
+              spentPercentage: spentPercentage.toFixed(1),
+              remaining: remaining.toFixed(2)
+            }
+          });
+        } else if (spentPercentage >= 75 && spentPercentage < 90) {
+          await this.notificationsService.createNotification({
+            userId,
+            title: '⚠️ Alerta de presupuesto',
+            message: `Has gastado el ${spentPercentage.toFixed(1)}% de tu presupuesto "${budget.name}". Te quedan $${remaining.toFixed(2)}.`,
+            type: NotificationType.BUDGET_ALERT,
+            priority: NotificationPriority.MEDIUM,
+            metadata: {
+              budgetId: budget.id,
+              categoryId,
+              spentPercentage: spentPercentage.toFixed(1),
+              remaining: remaining.toFixed(2)
+            }
+          });
+        }
+
+        // Alerta si se excede el presupuesto
+        if (currentSpent > budget.amount) {
+          const excess = currentSpent - budget.amount;
+          await this.notificationsService.createNotification({
+            userId,
+            title: '🔴 Presupuesto excedido',
+            message: `Has excedido tu presupuesto "${budget.name}" por $${excess.toFixed(2)}.`,
+            type: NotificationType.BUDGET_ALERT,
+            priority: NotificationPriority.HIGH,
+            metadata: {
+              budgetId: budget.id,
+              categoryId,
+              excess: excess.toFixed(2),
+              overspent: true
+            }
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error checking budget alerts:', error);
+      // No propagar el error para no afectar la creación de la transacción
+    }
   }
 }

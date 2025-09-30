@@ -17,14 +17,15 @@ export class BudgetsService {
   ) { }
 
 
-  async create(createBudgetDto: CreateBudgetDto) {
-    // Verifica si ya existe un presupuesto para la misma categoría y periodo
+  async create(createBudgetDto: CreateBudgetDto, userId: number) {
+    // Verifica si ya existe un presupuesto para la misma categoría y periodo del usuario
     const exists = await this.budgetsRepository.findOne({
       where: {
         category: { id: createBudgetDto.categoryId },
         period: createBudgetDto.period,
+        user: { id: userId }
       },
-      relations: ['category'],
+      relations: ['category', 'user'],
     });
 
     if (exists) {
@@ -36,25 +37,27 @@ export class BudgetsService {
     const budget = this.budgetsRepository.create({
       ...createBudgetDto,
       category,
+      user: { id: userId }
     });
 
     return await this.budgetsRepository.save(budget);
   }
 
-  async getBudgetStatus(id: number) {
+  async getBudgetStatus(id: number, userId: number) {
     const budget = await this.budgetsRepository.findOne({
-      where: { id },
-      relations: ['category'],
+      where: { id, user: { id: userId } },
+      relations: ['category', 'user'],
     });
 
     if (!budget) {
       throw new NotFoundException(`Presupuesto con id ${id} no encontrado`);
     }
 
-    // Sumar los gastos de la categoría y periodo del presupuesto
+    // Sumar los gastos de la categoría y periodo del presupuesto para este usuario
     const totalSpent = await this.transactionsService.sumExpensesByCategoryAndPeriod(
       budget.category.id,
       budget.period,
+      userId
     );
 
     return {
@@ -68,22 +71,22 @@ export class BudgetsService {
     };
   }
 
-  async findAll(filters: { period?: string; categoryId?: number }) {
-    const where: any = {};
+  async findAll(filters: { period?: string; categoryId?: number }, userId: number) {
+    const where: any = { user: { id: userId } };
     if (filters.period) where.period = filters.period;
     if (filters.categoryId) where.category = { id: filters.categoryId };
 
     return await this.budgetsRepository.find({
       where,
-      relations: ['category'],
+      relations: ['category', 'user'],
       order: { period: 'DESC', name: 'ASC' },
     });
   }
 
-  async findOne(id: number) {
+  async findOne(id: number, userId: number) {
     const budget = await this.budgetsRepository.findOne({
-      where: { id },
-      relations: ['category'],
+      where: { id, user: { id: userId } },
+      relations: ['category', 'user'],
     });
 
     if (!budget) {
@@ -93,8 +96,8 @@ export class BudgetsService {
     return budget;
   }
 
-  async update(id: number, updateBudgetDto: UpdateBudgetDto) {
-    const budget = await this.findOne(id);
+  async update(id: number, updateBudgetDto: UpdateBudgetDto, userId: number) {
+    const budget = await this.findOne(id, userId);
 
     // Si se envía un nuevo categoryId, valida y actualiza la categoría
     if (updateBudgetDto.categoryId) {
@@ -109,8 +112,8 @@ export class BudgetsService {
     return await this.budgetsRepository.save(budget);
   }
 
-  async remove(id: number) {
-    const budget = await this.findOne(id); // Valida que exista, lanza excepción si no
+  async remove(id: number, userId: number) {
+    const budget = await this.findOne(id, userId); // Valida que exista, lanza excepción si no
     await this.budgetsRepository.remove(budget);
     return { message: `Presupuesto con id ${id} eliminado correctamente` };
   }

@@ -27,6 +27,9 @@ export class User {
     @Column({ nullable: true })
     avatar: string; // URL de foto de perfil
 
+    @Column({ nullable: true })
+    phone: string; // Teléfono del usuario
+
     @Column({ default: true })
     isActive: boolean;
 
